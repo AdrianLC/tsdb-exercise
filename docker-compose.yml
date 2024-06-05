@@ -1,0 +1,18 @@
+
+
+services:
+  psql:
+    image: postgres:16-alpine
+    command: psql ${DB_DSN}
+    working_dir: /files
+    volumes:
+    - ./files:/files:ro
+    environment:
+     - DB_DSN
+
+  benchmark:
+    build: .
+    volumes:
+    - ./files:/files:ro
+    environment:
+     - DB_DSN
