@@ -8,22 +8,19 @@ import (
 	"time"
 )
 
-func StreamParamsFilePath(filePath string, paramsChan chan<- QueryParams) error {
+func StreamParamsFilePath(filePath string, fn QueryFunc) error {
 	log := slog.With("file_path", filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Error("could not open csv: %w", err)
-		close(paramsChan)
 		return err
 	}
 	defer file.Close()
 	log.Info("reading csv")
-	return StreamParams(file, paramsChan)
+	return StreamParams(file, fn)
 }
 
-func StreamParams(file io.Reader, paramsChan chan<- QueryParams) error {
-	defer close(paramsChan)
-
+func StreamParams(file io.Reader, fn QueryFunc) error {
 	reader := csv.NewReader(file)
 	reader.FieldsPerRecord = 3
 	reader.TrimLeadingSpace = true
@@ -59,7 +56,7 @@ func StreamParams(file io.Reader, paramsChan chan<- QueryParams) error {
 			continue
 		}
 
-		paramsChan <- QueryParams{row[0], startTime, endTime}
+		fn(QueryParams{row[0], startTime, endTime})
 
 		currentRow++
 		log = slog.With("row_number", currentRow)

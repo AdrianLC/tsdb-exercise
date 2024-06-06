@@ -10,6 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type QueryFunc func(QueryParams) error
+
 const sqlQuery = `
 	SELECT time_bucket('1 minute', ts, 'UTC') AS bucket,
 		min(usage) AS min_cpu,
@@ -32,15 +34,14 @@ type QueryParams struct {
 }
 
 type querier struct {
-	dbpool     *pgxpool.Pool
-	paramsChan <-chan QueryParams
+	dbpool *pgxpool.Pool
 }
 
 type PoolOptions struct {
 	MinConns, MaxConns int
 }
 
-func NewQuerier(dsn string, poolOpts PoolOptions, paramsChan <-chan QueryParams) (*querier, error) {
+func NewQuerier(dsn string, poolOpts PoolOptions) (*querier, error) {
 	connStr := dsn + "&pool_min_conns=" + strconv.Itoa(poolOpts.MinConns) +
 		"&pool_max_conns=" + strconv.Itoa(poolOpts.MaxConns)
 
@@ -50,16 +51,16 @@ func NewQuerier(dsn string, poolOpts PoolOptions, paramsChan <-chan QueryParams)
 		return nil, err
 	}
 
-	return &querier{dbpool: dbpool, paramsChan: paramsChan}, nil
+	return &querier{dbpool: dbpool}, nil
 }
 
 func (q *querier) Close() {
 	q.dbpool.Close()
 }
 
-func (q *querier) Run() {
-	for params := range q.paramsChan {
-		q.executeQuery(params)
+func (q *querier) QueryCallback() QueryFunc {
+	return func(params QueryParams) error {
+		return q.executeQuery(params)
 	}
 }
 

@@ -18,21 +18,19 @@ type programArgs struct {
 
 func main() {
 	args := parseFlags()
-	queryParams := make(chan QueryParams)
 
-	querier, err := NewQuerier(os.Getenv(dsnEnvVar), PoolOptions{MinConns: 1, MaxConns: *args.numWorkers}, queryParams)
+	querier, err := NewQuerier(os.Getenv(dsnEnvVar), PoolOptions{MinConns: 1, MaxConns: *args.numWorkers})
 	if err != nil {
 		os.Exit(1)
 	}
 	defer querier.Close()
 
 	if *args.csvFilePath != "" {
-		go StreamParamsFilePath(*args.csvFilePath, queryParams)
+		StreamParamsFilePath(*args.csvFilePath, querier.QueryCallback())
 	} else {
 		fmt.Println("Awaiting CSV input from stdin:")
-		go StreamParams(os.Stdin, queryParams)
+		StreamParams(os.Stdin, querier.QueryCallback())
 	}
-	querier.Run()
 }
 
 func parseFlags() programArgs {
