@@ -23,9 +23,9 @@ func TestStreamParamsFilePath(t *testing.T) {
 	for params := range paramsChan {
 		numParams++
 
-		require.NotEmpty(params.hostname)
-		require.NotEmpty(params.startTime)
-		require.NotEmpty(params.endTime)
+		require.NotEmpty(params.Host)
+		require.NotEmpty(params.StartTime)
+		require.NotEmpty(params.EndTime)
 	}
 
 	require.Equal(expectedNumParams, numParams)

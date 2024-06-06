@@ -1,12 +1,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
-
-	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -22,16 +19,20 @@ type programArgs struct {
 func main() {
 	args := parseFlags()
 	queryParams := make(chan QueryParams)
+
+	querier, err := NewQuerier(os.Getenv(dsnEnvVar), PoolOptions{MinConns: 1, MaxConns: *args.numWorkers}, queryParams)
+	if err != nil {
+		os.Exit(1)
+	}
+	defer querier.Close()
+
 	if *args.csvFilePath != "" {
 		go StreamParamsFilePath(*args.csvFilePath, queryParams)
 	} else {
 		fmt.Println("Awaiting CSV input from stdin:")
 		go StreamParams(os.Stdin, queryParams)
 	}
-	for range queryParams {
-	}
-
-	testDBConn()
+	querier.Run()
 }
 
 func parseFlags() programArgs {
@@ -41,35 +42,4 @@ func parseFlags() programArgs {
 	}
 	flag.Parse()
 	return args
-}
-
-func testDBConn() {
-	// temporary code to move to test connectivity
-	dsn := os.Getenv(dsnEnvVar)
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, dsn)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
-		os.Exit(1)
-	}
-	defer conn.Close(ctx)
-
-	type Extension struct {
-		Extname    string
-		Extversion string
-	}
-
-	rows, err := conn.Query(ctx, "select extname, extversion from pg_extension")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Query failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	extensions, err := pgx.CollectRows(rows, pgx.RowToStructByName[Extension])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "CollectRows failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("%+v\n", extensions)
 }
