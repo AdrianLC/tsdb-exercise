@@ -2,9 +2,17 @@ FROM golang:1.21.10
 
 WORKDIR /app
 
-COPY * .
+RUN mkdir bin
 
-RUN go build -o benchmark main.go && \
-    chmod +x benchmark
+WORKDIR /app/src 
 
-ENTRYPOINT ["/app/benchmark"]
+COPY ./src/go.mod .
+COPY ./src/go.sum .
+RUN go mod download
+
+COPY ./src/ .
+RUN go build -o ../bin/benchmark . && \
+    chmod +x ../bin/benchmark
+
+WORKDIR /app
+ENTRYPOINT ["/app/bin/benchmark"]
