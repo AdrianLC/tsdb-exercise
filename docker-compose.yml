@@ -13,6 +13,6 @@ services:
   benchmark:
     build: .
     volumes:
-    - ./files:/files:ro
+    - ./files:/app/files:ro
     environment:
      - DB_DSN
