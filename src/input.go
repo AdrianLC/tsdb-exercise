@@ -12,7 +12,7 @@ func StreamParamsFilePath(filePath string, fn QueryFunc) error {
 	log := slog.With("file_path", filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
-		log.Error("could not open csv: %w", err)
+		log.Error("could not open csv", "err", err)
 		return err
 	}
 	defer file.Close()
@@ -30,7 +30,7 @@ func StreamParams(file io.Reader, fn QueryFunc) error {
 		if err == io.EOF {
 			return nil
 		}
-		slog.Warn("unexpected error reading csv header: %w", err)
+		slog.Warn("unexpected error reading csv header", "err", err)
 		// continue anyway, perhaps only the header is wrong
 	}
 
@@ -43,7 +43,7 @@ func StreamParams(file io.Reader, fn QueryFunc) error {
 			if err == io.EOF {
 				break
 			}
-			log.Warn("unexpected error reading csv row: %w", err)
+			log.Warn("unexpected error reading csv row", "err", err)
 			continue
 		}
 
@@ -69,7 +69,7 @@ func StreamParams(file io.Reader, fn QueryFunc) error {
 func parseTimestamp(value string, log *slog.Logger) (time.Time, error) {
 	t, err := time.Parse(time.DateTime, value)
 	if err != nil {
-		log.Warn("unexpected timestamp value: %w", err)
+		log.Warn("unexpected timestamp value", "err", err)
 	}
 	return t, err
 }
