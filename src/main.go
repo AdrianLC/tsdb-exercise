@@ -1,17 +1,15 @@
 package main
 
 import (
-	"context"
 	"flag"
-	"fmt"
+	"log/slog"
 	"os"
-
-	"github.com/jackc/pgx/v5"
 )
 
 const (
 	dsnEnvVar      = "DB_DSN"
 	defaultWorkers = 10
+	maxConnections = 25 // I checked this in the settings in the Timescale service
 )
 
 type programArgs struct {
@@ -21,17 +19,29 @@ type programArgs struct {
 
 func main() {
 	args := parseFlags()
-	queryParams := make(chan QueryParams)
-	if *args.csvFilePath != "" {
-		go StreamParamsFilePath(*args.csvFilePath, queryParams)
-	} else {
-		fmt.Println("Awaiting CSV input from stdin:")
-		go StreamParams(os.Stdin, queryParams)
-	}
-	for range queryParams {
+
+	numConns := min(*args.numWorkers, maxConnections)
+	if numConns < *args.numWorkers {
+		slog.With("num_connections", numConns, "num_workers", *args.numWorkers).
+			Warn("Number of connections is lower than number of workers due to max connections limit")
 	}
 
-	testDBConn()
+	querier, err := NewQuerier(os.Getenv(dsnEnvVar), numConns)
+	if err != nil {
+		os.Exit(1)
+	}
+	defer querier.Close()
+
+	if *args.csvFilePath != "" {
+		err = StreamParamsFilePath(*args.csvFilePath, querier.QueryCallback())
+	} else {
+		slog.Info("Reading CSV input from stdin")
+		err = StreamParams(os.Stdin, querier.QueryCallback())
+	}
+
+	if err != nil {
+		os.Exit(1)
+	}
 }
 
 func parseFlags() programArgs {
@@ -41,35 +51,4 @@ func parseFlags() programArgs {
 	}
 	flag.Parse()
 	return args
-}
-
-func testDBConn() {
-	// temporary code to move to test connectivity
-	dsn := os.Getenv(dsnEnvVar)
-	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, dsn)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
-		os.Exit(1)
-	}
-	defer conn.Close(ctx)
-
-	type Extension struct {
-		Extname    string
-		Extversion string
-	}
-
-	rows, err := conn.Query(ctx, "select extname, extversion from pg_extension")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Query failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	extensions, err := pgx.CollectRows(rows, pgx.RowToStructByName[Extension])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "CollectRows failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("%+v\n", extensions)
 }
