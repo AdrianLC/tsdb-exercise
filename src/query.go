@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 	"time"
-
-	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -37,34 +36,36 @@ type querier struct {
 	dbpool *pgxpool.Pool
 }
 
-type PoolOptions struct {
-	MinConns, MaxConns int
-}
+func NewQuerier(dsn string, numConns int) (*querier, error) {
+	// since this is for benchmark we want to have a fixed number of ready connections
+	// otherwise the first calls would be a bit slower due to the extra time to open new connections
+	connStr := dsn + "&pool_min_conns=" + strconv.Itoa(numConns) +
+		"&pool_max_conns=" + strconv.Itoa(numConns)
 
-func NewQuerier(dsn string, poolOpts PoolOptions) (*querier, error) {
-	connStr := dsn + "&pool_min_conns=" + strconv.Itoa(poolOpts.MinConns) +
-		"&pool_max_conns=" + strconv.Itoa(poolOpts.MaxConns)
-
-	dbpool, err := pgxpool.New(context.Background(), connStr)
+	ctx := context.Background()
+	dbpool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		slog.Error("failed to connect to database: %w", err)
 		return nil, err
 	}
+	// force before first query to open all connections
+	dbpool.AcquireAllIdle(ctx)
+	err = dbpool.Ping(ctx) // pgxpool.New might not really return an error yet
 
-	return &querier{dbpool: dbpool}, nil
+	return &querier{dbpool: dbpool}, err
 }
 
-func (q *querier) Close() {
+func (q querier) Close() {
 	q.dbpool.Close()
 }
 
-func (q *querier) QueryCallback() QueryFunc {
+func (q querier) QueryCallback() QueryFunc {
 	return func(params QueryParams) error {
 		return q.executeQuery(params)
 	}
 }
 
-func (q *querier) executeQuery(params QueryParams) error {
+func (q querier) executeQuery(params QueryParams) error {
 	log := slog.With("hostname", params.Host, "start_time", params.StartTime, "end_time", params.EndTime)
 	log.Info("executing query")
 

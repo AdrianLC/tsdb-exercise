@@ -2,13 +2,14 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log/slog"
 	"os"
 )
 
 const (
 	dsnEnvVar      = "DB_DSN"
 	defaultWorkers = 10
+	maxConnections = 25 // I checked this in the settings in the Timescale service
 )
 
 type programArgs struct {
@@ -19,17 +20,27 @@ type programArgs struct {
 func main() {
 	args := parseFlags()
 
-	querier, err := NewQuerier(os.Getenv(dsnEnvVar), PoolOptions{MinConns: 1, MaxConns: *args.numWorkers})
+	numConns := min(*args.numWorkers, maxConnections)
+	if numConns < *args.numWorkers {
+		slog.With("num_connections", numConns, "num_workers", *args.numWorkers).
+			Warn("Number of connections is lower than number of workers due to max connections limit")
+	}
+
+	querier, err := NewQuerier(os.Getenv(dsnEnvVar), numConns)
 	if err != nil {
 		os.Exit(1)
 	}
 	defer querier.Close()
 
 	if *args.csvFilePath != "" {
-		StreamParamsFilePath(*args.csvFilePath, querier.QueryCallback())
+		err = StreamParamsFilePath(*args.csvFilePath, querier.QueryCallback())
 	} else {
-		fmt.Println("Awaiting CSV input from stdin:")
-		StreamParams(os.Stdin, querier.QueryCallback())
+		slog.Info("Reading CSV input from stdin")
+		err = StreamParams(os.Stdin, querier.QueryCallback())
+	}
+
+	if err != nil {
+		os.Exit(1)
 	}
 }
 
