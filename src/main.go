@@ -46,7 +46,6 @@ func main() {
 
 	workers := NewWorkerPool(dbpool)
 	workers.Start(*args.numWorkers)
-	defer workers.Stop()
 
 	if *args.csvFilePath != "" {
 		err = StreamParamsFilePath(*args.csvFilePath, workers.QueryCallback())
@@ -54,6 +53,11 @@ func main() {
 		slog.Info("Reading CSV input from stdin")
 		err = StreamParams(os.Stdin, workers.QueryCallback())
 	}
+
+	workers.Stop()
+
+	stats := workers.GetStats()
+	stats.Print()
 }
 
 func parseFlags() programArgs {
