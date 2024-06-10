@@ -3,6 +3,7 @@ package main
 import (
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/cespare/xxhash"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,13 +23,15 @@ type workerPool struct {
 // NewWorkerPool creates a new worker pool
 // The pool can run multiple queries in parallel.
 // It forwards the params to the same worker consistently.
-func NewWorkerPool(dbpool *pgxpool.Pool) *workerPool {
-	return &workerPool{dbpool: dbpool, workFunc: defaulWorkFunc(dbpool)}
+func NewWorkerPool(dbpool *pgxpool.Pool, stats Stats) *workerPool {
+	return &workerPool{dbpool: dbpool, workFunc: defaulWorkFunc(dbpool, stats)}
 }
 
-func defaulWorkFunc(dbpool *pgxpool.Pool) WorkFunc {
+func defaulWorkFunc(dbpool *pgxpool.Pool, stats Stats) WorkFunc {
 	return func(workerIndex int, params QueryParams) {
+		start := time.Now()
 		executeQuery(dbpool, params)
+		stats.Record(time.Since(start))
 	}
 }
 
