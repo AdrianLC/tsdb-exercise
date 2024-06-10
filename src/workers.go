@@ -9,7 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const workerChannelSize = 10
+const workerChannelSize = 10 // this avoids blocking other workers when a hotspot happens for a given hostname
+// The channel can still buffer 10 queries to the same hostname without blocking the routing to other workers
 
 type WorkFunc func(int, QueryParams) // so we can swap it out from tests
 
