@@ -14,6 +14,7 @@ func TestStatsString(t *testing.T) {
 	}
 	require.Equal(t,
 		`	total_processing_time=10ns,
+	total_queries=5,
 	total_sum_query_time=17ns,
 	min_query_time=1ns,
 	median_query_time=2ns,

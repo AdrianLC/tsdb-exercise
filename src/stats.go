@@ -22,12 +22,13 @@ func (st *Stats) Print() {
 func (st *Stats) String() string {
 	return fmt.Sprintf(
 		`	total_processing_time=%v,
+	total_queries=%v,
 	total_sum_query_time=%v,
 	min_query_time=%v,
 	median_query_time=%v,
 	average_query_time=%v,
 	max_query_time=%v`,
-		st.TotalTime, st.SumTime(), st.MinTime(), st.MedianTime(), st.AvgTime(), st.MaxTime())
+		st.TotalTime, len(st.Durations), st.SumTime(), st.MinTime(), st.MedianTime(), st.AvgTime(), st.MaxTime())
 }
 
 func (st *Stats) ensureSorted() {
